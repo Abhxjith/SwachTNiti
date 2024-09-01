@@ -6,6 +6,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../services/dummy_gps_service.dart';
 
 class TruckTrackingMap extends StatelessWidget {
+  final MapController _mapController = MapController(); // 1. Add a MapController
+
   @override
   Widget build(BuildContext context) {
     final gpsService = Provider.of<DummyGPSService>(context);
@@ -74,55 +76,65 @@ class TruckTrackingMap extends StatelessWidget {
           ),
         ],
       ),
-      body: FlutterMap(
-        options: MapOptions(
-          center: gpsService.routePoints.isNotEmpty
-              ? gpsService.currentTruckPosition
-              : LatLng(18.9895, 73.1279),
-          zoom: 17.0,
-        ),
-        children: [
-          TileLayer(
-            urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            subdomains: ['a', 'b', 'c'],
-          ),
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: gpsService.routePoints,
-                color: Colors.blue,
-                strokeWidth: 7.0,
+      body: Consumer<DummyGPSService>(  // 2. Use Consumer to rebuild on data change
+        builder: (context, gpsService, child) {
+          // Update map center whenever truck position changes
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _mapController.move(gpsService.currentTruckPosition, _mapController.zoom);
+          });
+
+          return FlutterMap(
+            mapController: _mapController, // 3. Assign the MapController
+            options: MapOptions(
+              center: gpsService.routePoints.isNotEmpty
+                  ? gpsService.currentTruckPosition
+                  : LatLng(18.9895, 73.1279),
+              zoom: 17.0,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                subdomains: ['a', 'b', 'c'],
+              ),
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: gpsService.routePoints,
+                    color: Colors.blue,
+                    strokeWidth: 7.0,
+                  ),
+                ],
+              ),
+              MarkerLayer(
+                markers: [
+                  if (gpsService.routePoints.isNotEmpty)
+                    Marker(
+                      point: gpsService.currentTruckPosition,
+                      width: 70.0,
+                      height: 70.0,
+                      builder: (ctx) => Image.asset('assets/images/truck.png'),
+                    ),
+                  ...gpsService.redMarkers.asMap().entries.map((entry) {
+                    int index = entry.key;
+                    LatLng latLng = entry.value;
+                    bool passed = gpsService.redMarkerStates[index];
+                    return Marker(
+                      point: latLng,
+                      width: 30.0,
+                      height: 30.0,
+                      builder: (ctx) => Container(
+                        decoration: BoxDecoration(
+                          color: passed ? Colors.green : Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ],
               ),
             ],
-          ),
-          MarkerLayer(
-            markers: [
-              if (gpsService.routePoints.isNotEmpty)
-                Marker(
-                  point: gpsService.currentTruckPosition,
-                  width: 70.0,
-                  height: 70.0,
-                  builder: (ctx) => Image.asset('assets/images/truck.png'),
-                ),
-              ...gpsService.redMarkers.asMap().entries.map((entry) {
-                int index = entry.key;
-                LatLng latLng = entry.value;
-                bool passed = gpsService.redMarkerStates[index];
-                return Marker(
-                  point: latLng,
-                  width: 30.0,
-                  height: 30.0,
-                  builder: (ctx) => Container(
-                    decoration: BoxDecoration(
-                      color: passed ? Colors.green : Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
