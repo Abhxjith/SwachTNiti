@@ -1,0 +1,26 @@
+# pubspec.yaml
+
+name: truck_tracking_app
+description: A Flutter app to track trucks on OpenStreetMap using dummy GPS data.
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.12.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_map: ^5.0.0
+  latlong2: ^0.9.0
+  provider: ^6.0.5
+  http: ^1.2.2
+  google_fonts: ^6.2.1
+  font_awesome_flutter: ^10.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:  
+  assets:   
+    - assets/images/truck.png
