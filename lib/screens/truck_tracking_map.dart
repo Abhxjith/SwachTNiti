@@ -5,8 +5,15 @@ import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../services/dummy_gps_service.dart';
 
-class TruckTrackingMap extends StatelessWidget {
-  final MapController _mapController = MapController(); // 1. Add a MapController
+class TruckTrackingMap extends StatefulWidget {
+  @override
+  _TruckTrackingMapState createState() => _TruckTrackingMapState();
+}
+
+class _TruckTrackingMapState extends State<TruckTrackingMap> {
+  final MapController _mapController = MapController();
+  bool _hasReachedDestination = false;
+  LatLng? _lastKnownPosition;  // Store the last known valid position
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +56,7 @@ class TruckTrackingMap extends StatelessWidget {
               child: _buildPopupMenuItem('Logout', context),
             ),
           ],
-          color: Color(0xFFF7F7F7), // Set background color of popup menu
+          color: Color(0xFFF7F7F7),
         ),
         title: Text(
           'SwachTNiti',
@@ -76,19 +83,27 @@ class TruckTrackingMap extends StatelessWidget {
           ),
         ],
       ),
-      body: Consumer<DummyGPSService>(  // 2. Use Consumer to rebuild on data change
+      body: Consumer<DummyGPSService>(
         builder: (context, gpsService, child) {
-          // Update map center whenever truck position changes
+          if (!_hasReachedDestination && _checkIfReachedDestination(gpsService.currentTruckPosition)) {
+            setState(() {
+              _hasReachedDestination = true;
+            });
+          }
+
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _mapController.move(gpsService.currentTruckPosition, _mapController.zoom);
+            // Only update the map if the truck has not reached the destination
+            // and we have a valid position
+            if (!_hasReachedDestination && _isValidPosition(gpsService.currentTruckPosition)) {
+              _mapController.move(gpsService.currentTruckPosition, _mapController.zoom);
+              _lastKnownPosition = gpsService.currentTruckPosition; // Update last known position
+            }
           });
 
           return FlutterMap(
-            mapController: _mapController, // 3. Assign the MapController
+            mapController: _mapController,
             options: MapOptions(
-              center: gpsService.routePoints.isNotEmpty
-                  ? gpsService.currentTruckPosition
-                  : LatLng(18.9895, 73.1279),
+              center: _lastKnownPosition ?? LatLng(18.9895, 73.1279), // Use last known position
               zoom: 17.0,
             ),
             children: [
@@ -96,20 +111,21 @@ class TruckTrackingMap extends StatelessWidget {
                 urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 subdomains: ['a', 'b', 'c'],
               ),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: gpsService.routePoints,
-                    color: Colors.blue,
-                    strokeWidth: 7.0,
-                  ),
-                ],
-              ),
+              if (gpsService.routePoints.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: gpsService.routePoints,
+                      color: Colors.blue,
+                      strokeWidth: 7.0,
+                    ),
+                  ],
+                ),
               MarkerLayer(
                 markers: [
                   if (gpsService.routePoints.isNotEmpty)
                     Marker(
-                      point: gpsService.currentTruckPosition,
+                      point: _lastKnownPosition ?? gpsService.currentTruckPosition,
                       width: 70.0,
                       height: 70.0,
                       builder: (ctx) => Image.asset('assets/images/truck.png'),
@@ -163,5 +179,16 @@ class TruckTrackingMap extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  bool _checkIfReachedDestination(LatLng position) {
+    // Replace this logic with your actual destination check
+    LatLng destination = LatLng(18.9895, 73.1279); // Example destination
+    return position.latitude == destination.latitude && position.longitude == destination.longitude;
+  }
+
+  bool _isValidPosition(LatLng position) {
+    // Add logic to check if the position is valid (e.g., not (0,0))
+    return position.latitude != 0.0 && position.longitude != 0.0;
   }
 }
